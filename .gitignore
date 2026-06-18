@@ -1,5 +1,13 @@
 node_modules/
 __pycache__/
+*.pyc
 .env
+.env.local
+.env.production.local
 dist/
 jobs/
+temp_github_repo/
+*.egg-info/
+.venv/
+venv/
+.DS_Store
