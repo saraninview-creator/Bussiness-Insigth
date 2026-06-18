@@ -3,7 +3,7 @@ import {useNavigate} from 'react-router-dom';
 import DarkVeil from '../components/DarkVeil';
 
 const ALLOWED = ['.csv', '.xlsx', '.xls'];
-const API_URL = import.meta.env.VITE_API_URL || '';
+const API_URL = (import.meta.env.VITE_API_URL || '').replace(/\/+$/, '');
 
 export default function UploadPage({onJobCreated}) {
   const navigate = useNavigate();
