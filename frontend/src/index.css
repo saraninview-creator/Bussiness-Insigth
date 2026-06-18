@@ -9,19 +9,20 @@
 :root {
   --bg:           #0a0a0a;
   --sidebar:      #111111;
-  --surface:      #161616;
+  --surface:      #111111;
   --surface-alt:  #1c1c1c;
-  --border:       #2a2a2a;
+  --border:       #222222;
   --text:         #ffffff;
   --text-2:       #aaaaaa;
   --text-3:       #666666;
-  --insight:      #4a9eff;
-  --problem:      #ff6b6b;
-  --suggestion:   #5dcaa5;
+  --insight:      #3b82f6;
+  --problem:      #f87171;
+  --suggestion:   #34d399;
   --radius:       8px;
   --sidebar-w:    260px;
   --font:         'Inter', 'Segoe UI', system-ui, sans-serif;
 }
+
 
 /* ── Reset ─────────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -571,3 +572,226 @@ button { cursor: pointer; font-family: var(--font); }
 
 .error-page h2 { font-size: 20px; color: var(--problem); }
 .error-page p { color: var(--text-2); font-size: 14px; }
+
+/* ── Chatbot ──────────────────────────────────────────────── */
+.chatbot-panel {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  width: 340px;
+  height: 500px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  z-index: 100;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.6);
+  transition: transform 0.3s ease, opacity 0.3s ease;
+}
+
+.chatbot-header {
+  padding: 14px 16px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  border-radius: 12px 12px 0 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text);
+}
+
+.chatbot-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.chat-msg {
+  max-width: 85%;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.chat-msg.bot {
+  background: var(--surface-alt);
+  color: var(--text);
+  align-self: flex-start;
+  border-bottom-left-radius: 2px;
+}
+
+.chat-msg.user {
+  background: var(--insight);
+  color: #fff;
+  align-self: flex-end;
+  border-bottom-right-radius: 2px;
+}
+
+.chat-chips {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.chat-chip {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 6px 12px;
+  font-size: 12px;
+  color: var(--text-2);
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: left;
+}
+.chat-chip:hover {
+  background: var(--surface-alt);
+  color: var(--text);
+  border-color: var(--text-3);
+}
+
+.chatbot-input {
+  display: flex;
+  padding: 12px;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  border-radius: 0 0 12px 12px;
+  gap: 8px;
+}
+
+.chatbot-input input {
+  flex: 1;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 13px;
+  transition: border-color 0.2s;
+}
+
+.chatbot-input input:focus {
+  outline: none;
+  border-color: var(--insight);
+}
+
+.chatbot-btn {
+  background: var(--insight);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 0 16px;
+  font-weight: 600;
+  font-size: 13px;
+  transition: background 0.2s;
+}
+.chatbot-btn:hover { background: #3373e0; }
+
+.chatbot-toggle {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  width: 60px;
+  height: 60px;
+  background: var(--insight);
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+  z-index: 99;
+  transition: transform 0.2s;
+}
+.chatbot-toggle:hover { transform: scale(1.05); }
+
+/* ── What-If Simulator ────────────────────────────────────────── */
+.whatif-container {
+  background: #111111;
+  border: 1px solid #222222;
+  border-radius: 12px;
+  padding: 24px;
+  margin-top: 32px;
+}
+
+.whatif-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.whatif-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 32px;
+}
+@media (max-width: 860px) {
+  .whatif-grid { grid-template-columns: 1fr; }
+}
+
+.whatif-slider-group {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.whatif-label-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 14px;
+  color: var(--text-2);
+}
+
+.whatif-impact { font-size: 13px; transition: color 0.3s ease; }
+.whatif-impact.positive { color: var(--suggestion); font-weight: 600; }
+.whatif-impact.negative { color: var(--problem); font-weight: 600; }
+.whatif-impact.neutral { color: var(--text-3); font-weight: 500; }
+
+.whatif-slider {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 100%;
+  height: 6px;
+  background: var(--border);
+  border-radius: 3px;
+  outline: none;
+  transition: background 0.3s;
+}
+.whatif-slider::-webkit-slider-thumb {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--insight);
+  cursor: pointer;
+  border: 2px solid var(--bg);
+  box-shadow: 0 0 0 1px var(--border);
+  transition: transform 0.2s;
+}
+.whatif-slider::-webkit-slider-thumb:hover { transform: scale(1.15); }
+
+/* ── Recharts Overrides ─────────────────────────────────────── */
+.recharts-tooltip-cursor { fill: var(--surface-alt) !important; opacity: 0.5; }
+.recharts-cartesian-grid-horizontal line,
+.recharts-cartesian-grid-vertical line { stroke: var(--border) !important; }
+
+.whatif-recharts-container {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+  height: 300px;
+}

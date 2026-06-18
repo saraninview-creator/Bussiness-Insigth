@@ -26,22 +26,38 @@ export default function UploadPage({onJobCreated}) {
       const form = new FormData();
       form.append('file', file);
       form.append('explanation_level', explanationLevel);
-      const res = await fetch(`${API_URL}/upload`, {method: 'POST', body: form});
+      
+      const uploadWithRetry = async (retries = 2) => {
+        for (let i = 0; i <= retries; i++) {
+          try {
+            const res = await fetch(`${API_URL}/upload`, {method: 'POST', body: form});
+            if (res.ok) return res;
+            if (i === retries) return res; // return final failing response
+          } catch (e) {
+            if (i < retries) {
+              setUploading("Waking up server...");
+              await new Promise(r => setTimeout(r, 5000));
+            } else {
+              throw e;
+            }
+          }
+        }
+      };
+
+      const res = await uploadWithRetry(2);
+
       if (!res.ok) {
         let errorMsg = `Upload failed (HTTP ${res.status})`;
         try {
           const data = await res.json();
           errorMsg = data.detail || errorMsg;
         } catch (_) {
-          // Parse specific HTTP status codes with helpful messages
           if (res.status === 405) {
-            errorMsg = '405 Method Not Allowed — the backend server may not be running. Run .\\start.ps1 to start it.';
-          } else if (res.status === 503) {
-            errorMsg = '503 Service Unavailable — SUPABASE_URL / SUPABASE_KEY env vars are not set on the server.';
-          } else if (res.status === 404) {
-            errorMsg = '404 Not Found — check that the backend is running at the expected URL.';
+            errorMsg = '405 Method Not Allowed — ensure the backend is running and CORS is configured.';
+          } else if (res.status === 503 || res.status === 502) {
+            errorMsg = 'Service Unavailable — please wait a moment. The server may be waking up.';
           } else {
-            errorMsg = `Server error (${res.status}). Ensure the backend is running at http://localhost:8000.`;
+            errorMsg = `Server error (${res.status}). Ensure the backend is available at ${API_URL}.`;
           }
         }
         throw new Error(errorMsg);
@@ -50,9 +66,8 @@ export default function UploadPage({onJobCreated}) {
       onJobCreated?.({id: job_id, filename: file.name});
       navigate(`/processing/${job_id}`);
     } catch (e) {
-      // Network error (backend completely unreachable)
       if (e instanceof TypeError && e.message.includes('fetch')) {
-        setError('Cannot connect to the backend. Run .\\start.ps1 to start the server, then refresh.');
+        setError('Cannot connect to the backend. It may be sleeping or down.');
       } else {
         setError(e.message);
       }
