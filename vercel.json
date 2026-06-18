@@ -1,29 +1,20 @@
 {
   "version": 2,
-  "builds": [
-    {
-      "src": "api/index.py",
-      "use": "@vercel/python",
-      "config": {
-        "maxLambdaSize": "50mb"
-      }
-    },
-    {
-      "src": "frontend/package.json",
-      "use": "@vercel/static-build",
-      "config": {
-        "distDir": "dist"
-      }
+  "outputDirectory": "frontend/dist",
+  "buildCommand": "cd frontend && npm ci && npm run build",
+  "installCommand": "pip install -r requirements.txt",
+  "functions": {
+    "api/index.py": {
+      "runtime": "python3.11",
+      "maxDuration": 60
     }
-  ],
-  "routes": [
-    { "src": "/api/(.*)",       "dest": "/api/index.py" },
-    { "src": "/upload",         "dest": "/api/index.py" },
-    { "src": "/upload/(.*)",    "dest": "/api/index.py" },
-    { "src": "/status/(.*)",    "dest": "/api/index.py" },
-    { "src": "/result/(.*)",    "dest": "/api/index.py" },
-    { "src": "/health",         "dest": "/api/index.py" },
-    { "handle": "filesystem" },
-    { "src": "/(.*)",           "dest": "/index.html" }
+  },
+  "rewrites": [
+    { "source": "/api/:path*",    "destination": "/api/index.py" },
+    { "source": "/upload",        "destination": "/api/index.py" },
+    { "source": "/status/:path*", "destination": "/api/index.py" },
+    { "source": "/result/:path*", "destination": "/api/index.py" },
+    { "source": "/health",        "destination": "/api/index.py" },
+    { "source": "/(.*)",          "destination": "/index.html" }
   ]
 }

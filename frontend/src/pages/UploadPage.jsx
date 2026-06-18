@@ -28,12 +28,21 @@ export default function UploadPage({onJobCreated}) {
       form.append('explanation_level', explanationLevel);
       const res = await fetch(`${API_URL}/upload`, {method: 'POST', body: form});
       if (!res.ok) {
-        let errorMsg = 'Upload failed';
+        let errorMsg = `Upload failed (HTTP ${res.status})`;
         try {
           const data = await res.json();
           errorMsg = data.detail || errorMsg;
         } catch (_) {
-          errorMsg = `Server error (${res.status}). Ensure the backend is running.`;
+          // Parse specific HTTP status codes with helpful messages
+          if (res.status === 405) {
+            errorMsg = '405 Method Not Allowed — the backend server may not be running. Run .\\start.ps1 to start it.';
+          } else if (res.status === 503) {
+            errorMsg = '503 Service Unavailable — SUPABASE_URL / SUPABASE_KEY env vars are not set on the server.';
+          } else if (res.status === 404) {
+            errorMsg = '404 Not Found — check that the backend is running at the expected URL.';
+          } else {
+            errorMsg = `Server error (${res.status}). Ensure the backend is running at http://localhost:8000.`;
+          }
         }
         throw new Error(errorMsg);
       }
@@ -41,7 +50,12 @@ export default function UploadPage({onJobCreated}) {
       onJobCreated?.({id: job_id, filename: file.name});
       navigate(`/processing/${job_id}`);
     } catch (e) {
-      setError(e.message);
+      // Network error (backend completely unreachable)
+      if (e instanceof TypeError && e.message.includes('fetch')) {
+        setError('Cannot connect to the backend. Run .\\start.ps1 to start the server, then refresh.');
+      } else {
+        setError(e.message);
+      }
       setUploading(false);
     }
   }, [navigate, onJobCreated, explanationLevel]);
