@@ -1,0 +1,142 @@
+import React, {useState, useRef, useCallback} from 'react';
+import {useNavigate} from 'react-router-dom';
+import DarkVeil from '../components/DarkVeil';
+
+const ALLOWED = ['.csv', '.xlsx', '.xls'];
+const API_URL = import.meta.env.VITE_API_URL || '';
+
+export default function UploadPage({onJobCreated}) {
+  const navigate = useNavigate();
+  const [dragging, setDragging] = useState(false);
+  const [error, setError] = useState('');
+  const [uploading, setUploading] = useState(false);
+  const [explanationLevel, setExplanationLevel] = useState('concise_21s');
+  const inputRef = useRef();
+
+  const handleFile = useCallback(async (file) => {
+    if (!file) return;
+    const ext = '.' + file.name.split('.').pop().toLowerCase();
+    if (!ALLOWED.includes(ext)) {
+      setError(`Unsupported file type. Please upload ${ALLOWED.join(', ')}`);
+      return;
+    }
+    setError('');
+    setUploading(true);
+    try {
+      const form = new FormData();
+      form.append('file', file);
+      form.append('explanation_level', explanationLevel);
+      const res = await fetch(`${API_URL}/upload`, {method: 'POST', body: form});
+      if (!res.ok) {
+        let errorMsg = 'Upload failed';
+        try {
+          const data = await res.json();
+          errorMsg = data.detail || errorMsg;
+        } catch (_) {
+          errorMsg = `Server error (${res.status}). Ensure the backend is running.`;
+        }
+        throw new Error(errorMsg);
+      }
+      const {job_id} = await res.json();
+      onJobCreated?.({id: job_id, filename: file.name});
+      navigate(`/processing/${job_id}`);
+    } catch (e) {
+      setError(e.message);
+      setUploading(false);
+    }
+  }, [navigate, onJobCreated, explanationLevel]);
+
+  const onDrop = useCallback((e) => {
+    e.preventDefault();
+    setDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) handleFile(file);
+  }, [handleFile]);
+
+  const onInputChange = (e) => {
+    const file = e.target.files?.[0];
+    if (file) handleFile(file);
+  };
+
+  return (
+    <div className="upload-page" style={{position: 'relative', overflow: 'hidden'}}>
+      {/* Animated WebGL background */}
+      <div style={{position: 'absolute', inset: 0, zIndex: 0, pointerEvents: 'none', opacity: 0.35}}>
+        <DarkVeil speed={0.3} hueShift={220} noiseIntensity={0.04} warpAmount={0.3} />
+      </div>
+
+      <div className="upload-hero" style={{position: 'relative', zIndex: 1}}>
+        <h1>Turn Your Data<br />Into a Story</h1>
+        <p>
+          Upload a CSV or Excel file and DataNarrate will automatically
+          profile your data, discover key insights, and generate a
+          narrated insight video — in minutes, no configuration needed.
+        </p>
+      </div>
+
+      <div className="upload-preferences" style={{position: 'relative', zIndex: 1, marginBottom: '24px', display: 'flex', gap: '16px', justifyContent: 'center'}}>
+        <label style={{color: 'var(--text-2)', display: 'flex', alignItems: 'center', gap: '8px'}}>
+          <input 
+            type="radio" 
+            name="explanationLevel" 
+            value="concise_21s" 
+            checked={explanationLevel === 'concise_21s'} 
+            onChange={(e) => setExplanationLevel(e.target.value)} 
+          />
+          Short Pitch (21s Cut)
+        </label>
+        <label style={{color: 'var(--text-2)', display: 'flex', alignItems: 'center', gap: '8px'}}>
+          <input 
+            type="radio" 
+            name="explanationLevel" 
+            value="full_detailed" 
+            checked={explanationLevel === 'full_detailed'} 
+            onChange={(e) => setExplanationLevel(e.target.value)} 
+          />
+          Detailed Analyst Review
+        </label>
+      </div>
+
+      <div
+        className={`drop-zone${dragging ? ' drag-active' : ''}`}
+        style={{position: 'relative', zIndex: 1}}
+        onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+        onDragLeave={() => setDragging(false)}
+        onDrop={onDrop}
+        onClick={() => inputRef.current?.click()}
+      >
+        <input
+          ref={inputRef}
+          type="file"
+          accept=".csv,.xlsx,.xls"
+          onChange={onInputChange}
+          style={{display:'none'}}
+        />
+        {uploading ? (
+          <>
+            <div className="spinner" />
+            <div className="drop-title">Uploading…</div>
+          </>
+        ) : (
+          <>
+            <div className="drop-icon">📂</div>
+            <div className="drop-title">
+              {dragging ? 'Drop your file here' : 'Drop your file, or click to browse'}
+            </div>
+            <div className="drop-subtitle">Supports CSV, Excel (.xlsx, .xls)</div>
+            <div className="drop-types">
+              {ALLOWED.map(t => <span key={t} className="type-badge">{t.toUpperCase()}</span>)}
+            </div>
+          </>
+        )}
+      </div>
+
+      {error && <div className="upload-error" style={{position: 'relative', zIndex: 1}}>⚠ {error}</div>}
+
+      <div style={{position: 'relative', zIndex: 1, color: 'var(--text-3)', fontSize: 12, textAlign: 'center', maxWidth: 420}}>
+        Cloud-powered analysis backed by Supabase.
+        Larger files (&gt;10 MB) may take a few extra minutes to render.
+      </div>
+    </div>
+  );
+}
