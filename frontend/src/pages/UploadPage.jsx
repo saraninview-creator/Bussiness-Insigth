@@ -3,7 +3,8 @@ import {useNavigate} from 'react-router-dom';
 import DarkVeil from '../components/DarkVeil';
 
 const ALLOWED = ['.csv', '.xlsx', '.xls'];
-const API_URL = (import.meta.env.VITE_API_URL || '').replace(/\/+$/, '');
+// Dynamically retrieve the API base URL from the environment (Next.js or Vite).
+const API_URL = (import.meta.env?.VITE_API_URL || import.meta.env?.NEXT_PUBLIC_API_URL || '').replace(/\/+$/, '');
 
 export default function UploadPage({onJobCreated}) {
   const navigate = useNavigate();
@@ -20,6 +21,12 @@ export default function UploadPage({onJobCreated}) {
       setError(`Unsupported file type. Please upload ${ALLOWED.join(', ')}`);
       return;
     }
+    
+    if (!API_URL) {
+      setError("Backend API URL is not configured. Please set VITE_API_URL or NEXT_PUBLIC_API_URL in your environment.");
+      return;
+    }
+
     setError('');
     setUploading(true);
     try {
@@ -30,7 +37,13 @@ export default function UploadPage({onJobCreated}) {
       const uploadWithRetry = async (retries = 2) => {
         for (let i = 0; i <= retries; i++) {
           try {
-            const res = await fetch(`${API_URL}/upload`, {method: 'POST', body: form});
+            // Explicitly use the POST method.
+            // When using FormData as the body, fetch automatically sets the
+            // Content-Type to multipart/form-data with the correct boundary string.
+            const res = await fetch(`${API_URL}/upload`, {
+              method: 'POST',
+              body: form,
+            });
             if (res.ok) return res;
             if (i === retries) return res; // return final failing response
           } catch (e) {
@@ -53,7 +66,7 @@ export default function UploadPage({onJobCreated}) {
           errorMsg = data.detail || errorMsg;
         } catch (_) {
           if (res.status === 405) {
-            errorMsg = '405 Method Not Allowed — ensure the backend is running and CORS is configured.';
+            errorMsg = '405 Method Not Allowed — ensure the backend is running and CORS is configured, and your API URL is correct.';
           } else if (res.status === 503 || res.status === 502) {
             errorMsg = 'Service Unavailable — please wait a moment. The server may be waking up.';
           } else {

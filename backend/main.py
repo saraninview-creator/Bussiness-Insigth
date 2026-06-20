@@ -4,10 +4,14 @@ Endpoints: POST /upload, GET /status/{job_id}, GET /result/{job_id}
 """
 from __future__ import annotations
 
+import os
 import threading
 import uuid
 from pathlib import Path
 
+import json
+import pandas as pd
+from pydantic import BaseModel
 import aiofiles
 from fastapi import BackgroundTasks, FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
@@ -15,14 +19,22 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from pipeline import JOBS_DIR, get_result, get_status, job_dir, run_pipeline
+from modules.chatbot import HybridDataBot
+
+class ChatRequest(BaseModel):
+    query: str
 
 app = FastAPI(title="DataNarrate API", version="1.0.0")
 
+# Render backend explicitly configures CORS for the Vercel frontend
+FRONTEND_URL = os.environ.get("FRONTEND_URL", "*")
+allowed_origins = [FRONTEND_URL] if FRONTEND_URL != "*" else ["*"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=allowed_origins,
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
 )
 
@@ -96,6 +108,57 @@ async def get_job_result(job_id: str):
     return JSONResponse(result)
 
 
+@app.post("/api/chat/{job_id}")
+async def post_chat_query(job_id: str, request: ChatRequest):
+    jd = job_dir(job_id)
+    if not jd.exists():
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    # Locate the originally saved upload representation accurately.
+    upload_file = None
+    for ext in ALLOWED_EXTENSIONS:
+        if (jd / f"upload{ext}").exists():
+            upload_file = jd / f"upload{ext}"
+            break
+            
+    if not upload_file:
+        raise HTTPException(status_code=404, detail="Original dataset unrecoverable for active job.")
+
+    # Derive analytics summary
+    findings_summary = "No insights available."
+    findings_path = jd / "findings.json"
+    if findings_path.exists():
+        try:
+            findings = json.loads(findings_path.read_text(encoding="utf-8"))
+            findings_summary = "\n".join([f"- {f.get('text', '')}" for f in findings])
+        except Exception:
+            pass
+
+    # Read active DataFrame
+    try:
+        if str(upload_file).endswith('.csv'):
+            df = pd.read_csv(upload_file)
+        else:
+            df = pd.read_excel(upload_file)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Data parser error loading active dataset context: {str(e)}")
+
+    # Instantiate hybrid conversational protocol
+    try:
+        bot = HybridDataBot(df, findings_summary)
+        response = bot.ask(request.query)
+        return JSONResponse({"response": response})
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Hybrid Chatbot reasoning error: {str(e)}")
+
+
 @app.get("/health")
 async def health():
     return {"status": "ok"}
+
+
+if __name__ == "__main__":
+    import uvicorn
+    # Render requires binding to 0.0.0.0 and mapping to the dynamic PORT env var
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=False)

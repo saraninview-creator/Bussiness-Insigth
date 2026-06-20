@@ -110,7 +110,7 @@ def run_pipeline(job_id: str, filepath: str, explanation_level: str = "concise_2
 
         # ── Stage 3: Findings + Script ───────────────────────────────────
         set_status(job_id, "scripting")
-        findings = generate_findings(profile, explanation_level)
+        findings = generate_findings(filepath, profile, explanation_level)
         findings = enrich_findings(findings, profile)
         script = generate_script(findings, explanation_level)
         # Attach script info (timestamps will be filled after TTS)
@@ -185,30 +185,42 @@ def run_pipeline(job_id: str, filepath: str, explanation_level: str = "concise_2
         raise
 
 
+import shutil
+
 def _render_video(props_path: str, output_path: str) -> None:
-    """Call Remotion CLI via Node to render the video."""
-    props_path_fwd = props_path.replace("\\", "/")
-    output_path_fwd = output_path.replace("\\", "/")
-    remotion_entry = str(REMOTION_DIR / "src" / "index.tsx").replace("\\", "/")
+    """Call Remotion CLI via Node to render the video securely."""
+    # Hard-anchor the remotion directory against the pipeline component specifically.
+    remotion_abs = os.path.abspath(os.path.join(Path(__file__).parent.parent, "remotion"))
+    
+    # Normalize paths for Remotion
+    props_abs = os.path.abspath(props_path).replace("\\", "/")
+    output_abs = os.path.abspath(output_path).replace("\\", "/")
+
+    # Robust cross-platform handling of the 'npx' executable.
+    npx_exec = shutil.which("npx")
+    if not npx_exec:
+        raise RuntimeError("FATAL: 'npx' executable not found in PATH. Ensure Node.js is correctly installed in your Docker container or system.")
 
     cmd = [
-        "npx",
+        npx_exec,
         "--yes",
         "remotion",
         "render",
-        remotion_entry,
+        "src/index.tsx",
         "DataNarrate",
-        output_path_fwd,
-        f"--props={props_path_fwd}",
-        "--log=error",
+        output_abs,
+        f"--props={props_abs}",
+        "--log=error"
     ]
 
     result = subprocess.run(
         cmd,
-        cwd=str(REMOTION_DIR),
-        capture_output=False,
+        cwd=remotion_abs,  # Operating context safely mapped directly into the Remotion root
+        capture_output=True,
         timeout=600,
-        shell=True,
+        shell=False, # Dropped shell mode for security and exact executable precision
     )
+    
     if result.returncode != 0:
-        raise RuntimeError(f"Remotion render failed (exit {result.returncode})")
+        err = result.stderr.decode('utf-8') if result.stderr else "Unknown Remotion Error"
+        raise RuntimeError(f"Remotion render failed securely (exit code {result.returncode}): {err}")
