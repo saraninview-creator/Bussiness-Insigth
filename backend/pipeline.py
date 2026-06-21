@@ -190,16 +190,14 @@ import shutil
 def _render_video(props_path: str, output_path: str) -> None:
     """Call Remotion CLI via Node to render the video securely."""
     # Hard-anchor the remotion directory against the pipeline component specifically.
-    remotion_abs = os.path.abspath(os.path.join(Path(__file__).parent.parent, "remotion"))
+    remotion_abs = os.path.abspath(os.path.join(os.getcwd(), "remotion"))
     
     # Normalize paths for Remotion
     props_abs = os.path.abspath(props_path).replace("\\", "/")
     output_abs = os.path.abspath(output_path).replace("\\", "/")
 
-    # Robust cross-platform handling of the 'npx' executable.
-    npx_exec = shutil.which("npx")
-    if not npx_exec:
-        raise RuntimeError("FATAL: 'npx' executable not found in PATH. Ensure Node.js is correctly installed in your Docker container or system.")
+    # Robust cross-platform handling of the 'npx' executable dynamically based on OS.
+    npx_exec = 'npx.cmd' if os.name == 'nt' else 'npx'
 
     cmd = [
         npx_exec,

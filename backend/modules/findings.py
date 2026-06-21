@@ -29,17 +29,17 @@ class FindingsEngine:
         for col in self.df.columns:
             if self.df[col].dtype == 'object':
                 try:
-                    # Attempt safe datetime conversion
-                    parsed = pd.to_datetime(self.df[col], errors='ignore')
-                    if pd.api.types.is_datetime64_any_dtype(parsed):
-                        self.df[col] = parsed
+                    # Attempt safe datetime conversion utilizing user-defined coerce logic
+                    parsed = pd.to_datetime(self.df[col], errors='coerce')
+                    if not parsed.isna().all():
+                        self.df[col] = parsed.dt.tz_localize('UTC')
                 except Exception:
                     pass
 
     def get_time_series_trends(self) -> list[dict]:
         """Calculate slopes to say 'Sales are trending up by X%'"""
         findings = []
-        date_cols = self.df.select_dtypes(include=['datetime64', 'datetz']).columns
+        date_cols = self.df.select_dtypes(include=['datetime', 'datetimetz']).columns
         num_cols = self.df.select_dtypes(include=['number']).columns
         
         if len(date_cols) == 0 or len(num_cols) == 0:
@@ -129,7 +129,7 @@ class FindingsEngine:
     def get_categorical_dominance(self) -> list[dict]:
         """Categorical dominance (finding if one category makes up >50% of the total)"""
         findings = []
-        cat_cols = self.df.select_dtypes(exclude=['number', 'datetime64', 'datetz']).columns
+        cat_cols = self.df.select_dtypes(exclude=['number', 'datetime', 'datetimetz']).columns
         
         total_rows = len(self.df)
         if total_rows == 0:
