@@ -38,6 +38,11 @@ from modules.tts import concatenate_audio, synthesize_segments
 JOBS_DIR = Path(__file__).parent / "jobs"
 REMOTION_DIR = Path(__file__).parent.parent / "remotion"
 
+# Print at module load — appears immediately in Render startup logs
+print(f"[STARTUP] pipeline.py loaded from: {__file__}")
+print(f"[STARTUP] REMOTION_DIR resolved to: {REMOTION_DIR.resolve()}")
+print(f"[STARTUP] REMOTION_DIR exists: {REMOTION_DIR.exists()}")
+
 
 def job_dir(job_id: str) -> Path:
     d = JOBS_DIR / job_id
@@ -193,6 +198,20 @@ def _render_video(props_path: str, output_path: str) -> None:
     # This resolves correctly BOTH locally (C:\...\insight\remotion)
     # AND inside the Render container (/app/remotion) regardless of cwd.
     remotion_abs = str(REMOTION_DIR.resolve())
+
+    # ── Runtime path validation (shows up in Render logs) ────────────────────
+    print(f"[DEBUG] Python cwd         : {os.getcwd()}")
+    print(f"[DEBUG] pipeline __file__  : {__file__}")
+    print(f"[DEBUG] REMOTION_DIR       : {REMOTION_DIR}")
+    print(f"[DEBUG] remotion_abs       : {remotion_abs}")
+    print(f"[DEBUG] remotion exists    : {os.path.exists(remotion_abs)}")
+
+    if not os.path.exists(remotion_abs):
+        import glob
+        nearby = glob.glob('/app/*') or glob.glob(str(Path(remotion_abs).parent / '*'))
+        print(f"[CRITICAL ERROR] {remotion_abs} does not exist!")
+        print(f"[CRITICAL ERROR] Contents of parent dir: {nearby}")
+        raise FileNotFoundError(f"Remotion directory not found: {remotion_abs}")
 
     # Normalize paths for Remotion (forward slashes satisfy Remotion's CLI parser)
     props_abs = os.path.abspath(props_path).replace("\\", "/")

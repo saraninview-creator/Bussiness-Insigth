@@ -1,0 +1,36 @@
+# Prevent local node_modules from being sent to the Docker build context.
+# If local node_modules are sent, they overwrite the npm ci installation.
+node_modules
+**/node_modules
+
+# Python artifacts
+__pycache__
+**/__pycache__
+*.pyc
+*.pyo
+.venv
+venv
+
+# Build output
+dist
+frontend/dist
+
+# Secrets and env files
+.env
+.env.local
+.env.production.local
+
+# Git
+.git
+.gitignore
+
+# Jobs/temp data
+backend/jobs
+
+# Dev logs
+*.log
+remotion/log.txt
+remotion/render_log.txt
+
+# Temp
+temp_github_repo
