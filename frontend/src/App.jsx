@@ -1,22 +1,24 @@
 import React from 'react';
-import {BrowserRouter, Route, Routes, useNavigate} from 'react-router-dom';
+import { BrowserRouter, Route, Routes, useNavigate } from 'react-router-dom';
+import LandingPage from './pages/LandingPage.jsx';
 import UploadPage from './pages/UploadPage.jsx';
 import ProcessingPage from './pages/ProcessingPage.jsx';
 import ResultsPage from './pages/ResultsPage.jsx';
+import logo from './assets/logo.png';
 
-function Sidebar({recentJobs = []}) {
+function Sidebar({ recentJobs = [] }) {
   const navigate = useNavigate();
   return (
     <aside className="sidebar">
       <div className="sidebar-logo">
-        <div className="sidebar-logo-icon">📊</div>
+        <img src={logo} alt="logo" style={{ width: 28, height: 28, objectFit: 'contain', borderRadius: 6 }} />
         <span className="sidebar-logo-text">DataNarrate</span>
       </div>
 
       <nav className="sidebar-nav">
         <div className="sidebar-section-label">Recent</div>
         {recentJobs.length === 0 ? (
-          <div style={{padding: '8px 16px', color: 'var(--text-3)', fontSize: 12}}>
+          <div style={{ padding: '8px 16px', color: 'var(--text-3)', fontSize: 12 }}>
             No analyses yet
           </div>
         ) : (
@@ -31,7 +33,7 @@ function Sidebar({recentJobs = []}) {
       </nav>
 
       <div className="sidebar-footer">
-        <button className="btn-new" onClick={() => navigate('/')}>
+        <button className="btn-new" onClick={() => navigate('/app')}>
           <span>+</span> New Analysis
         </button>
       </div>
@@ -39,7 +41,7 @@ function Sidebar({recentJobs = []}) {
   );
 }
 
-function Layout({children, breadcrumb, recentJobs}) {
+function Layout({ children, breadcrumb, recentJobs }) {
   return (
     <div className="layout">
       <Sidebar recentJobs={recentJobs} />
@@ -70,21 +72,25 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={
+        {/* ── Landing page (public home) ── */}
+        <Route path="/" element={<LandingPage />} />
+
+        {/* ── App routes (inside sidebar layout) ── */}
+        <Route path="/app" element={
           <Layout recentJobs={recentJobs}>
             <UploadPage onJobCreated={addJob} />
           </Layout>
-        }/>
+        } />
         <Route path="/processing/:jobId" element={
           <Layout breadcrumb={<>Analysis <span>in progress</span></>} recentJobs={recentJobs}>
             <ProcessingPage />
           </Layout>
-        }/>
+        } />
         <Route path="/results/:jobId" element={
           <Layout breadcrumb={<>Analysis <span>complete</span></>} recentJobs={recentJobs}>
             <ResultsPage />
           </Layout>
-        }/>
+        } />
       </Routes>
     </BrowserRouter>
   );
