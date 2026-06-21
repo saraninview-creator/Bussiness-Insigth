@@ -1,39 +1,46 @@
 # DataNarrate Full-Stack Container (Python Backend + Node.js Remotion)
-# Perfect for Render.com deployment
+# Render.com deployment — single image with Python + Node.js
 
-# 1. Base Image: Python 3.10 slim for efficient resource usage
+# ── Stage 1: Base image ───────────────────────────────────────────────────────
 FROM python:3.10-slim
 
-# 2. Install essential system libraries, curl, and ffmpeg (vital for edge-tts and Remotion)
+# ── Stage 2: System dependencies (ffmpeg, chromium for Remotion/Puppeteer) ───
 RUN apt-get update && \
-    apt-get install -y curl ffmpeg procps chromium \
-    libnss3 libatk-bridge2.0-0 libxcomposite1 \
-    libxrandr2 libgbm1 libasound2 \
-    && rm -rf /var/lib/apt/lists/*
+    apt-get install -y --no-install-recommends \
+        curl ffmpeg procps \
+        chromium libnss3 libatk-bridge2.0-0 libxcomposite1 \
+        libxrandr2 libgbm1 libasound2 && \
+    rm -rf /var/lib/apt/lists/*
 
-# 3. Install Node.js 18+ (LTS) globally inside the same container
+# ── Stage 3: Node.js 18 LTS ──────────────────────────────────────────────────
 RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - && \
-    apt-get install -y nodejs
+    apt-get install -y --no-install-recommends nodejs && \
+    rm -rf /var/lib/apt/lists/*
 
-# 4. Set the general working directory
+# ── Stage 4: Working directory ───────────────────────────────────────────────
 WORKDIR /app
 
-# 5. Bring in Python Dependencies and install globally
+# ── Stage 5: Python dependencies (cached layer) ──────────────────────────────
 COPY backend/requirements.txt ./backend/
 RUN pip install --no-cache-dir -r ./backend/requirements.txt
 
-# 6. Bring in Node/Remotion Dependencies and install
+# ── Stage 6: Node/Remotion dependencies (cached layer) ───────────────────────
 COPY remotion/package.json remotion/package-lock.json ./remotion/
 RUN cd remotion && npm ci
 
-# 7. Copy all actual application logic
-COPY backend/ ./backend/
-COPY remotion/ ./remotion/
+# ── Stage 7: Copy ALL project files into /app ─────────────────────────────────
+# This single command guarantees /app/remotion, /app/backend, /app/api, etc.
+# all land exactly where Python's Path(__file__) resolution expects them.
+COPY . .
 
-# 8. Set up execution logic: Bind to dynamic PORT & uvicorn from backend
-WORKDIR /app/backend
+# ── Stage 8: Verify the directory structure at build time (sanity check) ──────
+RUN echo "=== /app structure ===" && ls -la /app && \
+    echo "=== /app/remotion ===" && ls /app/remotion
+
+# ── Stage 9: Runtime environment ─────────────────────────────────────────────
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 
-# This triggers the uvicorn hook we wrote, running the backend and waiting for tasks.
+# Run uvicorn from the backend directory
+WORKDIR /app/backend
 CMD ["python", "main.py"]

@@ -189,14 +189,16 @@ import shutil
 
 def _render_video(props_path: str, output_path: str) -> None:
     """Call Remotion CLI via Node to render the video securely."""
-    # Hard-anchor the remotion directory against the pipeline component specifically.
-    remotion_abs = os.path.abspath(os.path.join(os.getcwd(), "remotion"))
-    
-    # Normalize paths for Remotion
+    # Use the module-level REMOTION_DIR constant which is anchored via Path(__file__).
+    # This resolves correctly BOTH locally (C:\...\insight\remotion)
+    # AND inside the Render container (/app/remotion) regardless of cwd.
+    remotion_abs = str(REMOTION_DIR.resolve())
+
+    # Normalize paths for Remotion (forward slashes satisfy Remotion's CLI parser)
     props_abs = os.path.abspath(props_path).replace("\\", "/")
     output_abs = os.path.abspath(output_path).replace("\\", "/")
 
-    # Robust cross-platform handling of the 'npx' executable dynamically based on OS.
+    # On Windows use 'npx.cmd'; on Linux/macOS (Render container) use 'npx'
     npx_exec = 'npx.cmd' if os.name == 'nt' else 'npx'
 
     cmd = [
@@ -211,14 +213,17 @@ def _render_video(props_path: str, output_path: str) -> None:
         "--log=error"
     ]
 
+    print(f"[Remotion] cwd={remotion_abs}")
+    print(f"[Remotion] cmd={' '.join(cmd)}")
+
     result = subprocess.run(
         cmd,
-        cwd=remotion_abs,  # Operating context safely mapped directly into the Remotion root
+        cwd=remotion_abs,
         capture_output=True,
         timeout=600,
-        shell=False, # Dropped shell mode for security and exact executable precision
+        shell=False,
     )
-    
+
     if result.returncode != 0:
-        err = result.stderr.decode('utf-8') if result.stderr else "Unknown Remotion Error"
-        raise RuntimeError(f"Remotion render failed securely (exit code {result.returncode}): {err}")
+        err = result.stderr.decode('utf-8', errors='replace') if result.stderr else "Unknown Remotion Error"
+        raise RuntimeError(f"Remotion render failed (exit {result.returncode}): {err}")
