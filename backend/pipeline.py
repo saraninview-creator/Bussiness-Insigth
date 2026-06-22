@@ -36,7 +36,7 @@ from modules.script_gen import generate_script
 from modules.tts import concatenate_audio, synthesize_segments
 
 JOBS_DIR = Path(__file__).parent / "jobs"
-# REMOTION_DIR is now resolved dynamically inside the render function as requested
+# REMOTION_DIR and related retirement complete. Video now handled via Wan2.1 modules.
 
 
 def job_dir(job_id: str) -> Path:
@@ -140,37 +140,29 @@ def run_pipeline(job_id: str, filepath: str, explanation_level: str = "concise_2
             json.dumps(segments, indent=2, default=str), encoding="utf-8"
         )
 
-        # ── Stage 5: Assemble Video ──────────────────────────────────────
-        set_status(job_id, "assembling_video")
-        props = {
-            "jobId": job_id,
-            "findings": findings,
-            "audioFile": "",
-            "segments": segments,
-        }
-        props_path = jd / "props.json"
-        props_path.write_text(json.dumps(props, default=str), encoding="utf-8")
+        # ── Stage 5: Done ────────────────────────────────────────────────
+        # Remotion video assembly removed in favor of dynamic AI video generation.
+        set_status(job_id, "done")
 
-        output_mp4 = str(jd / "video.mp4")
-        _render_video(str(props_path), output_mp4)
-
-        video_url = f"/videos/{job_id}/video.mp4"
+        video_url = None # Will be filled if Wan generation is triggered elsewhere
         
         # ── Stage 6: Supabase Cloud Sync (Optional) ──────────────────────
         if supabase_client:
-            try:
-                with open(output_mp4, "rb") as f:
-                    supabase_client.storage.from_("datanarrate").upload(
-                        file=f,
-                        path=f"{job_id}/video.mp4",
-                        file_options={"content-type": "video/mp4"}
-                    )
-                # Get the public URL for the video
-                video_url = supabase_client.storage.from_("datanarrate").get_public_url(f"{job_id}/video.mp4")
-            except Exception as e:
-                print("Supabase storage upload error:", e)
+            # Video sync disabled as no video.mp4 is produced by this standard pipeline anymore
+            # try:
+            #     with open(output_mp4, "rb") as f:
+            #         supabase_client.storage.from_("datanarrate").upload(
+            #             file=f,
+            #             path=f"{job_id}/video.mp4",
+            #             file_options={"content-type": "video/mp4"}
+            #         )
+            #     # Get the public URL for the video
+            #     video_url = supabase_client.storage.from_("datanarrate").get_public_url(f"{job_id}/video.mp4")
+            # except Exception as e:
+            #     print("Supabase storage upload error:", e)
+            pass
 
-            # Update the DB with the final findings and video_url
+            # Update the DB with the final findings
             try:
                 data = {"findings": findings, "video_url": video_url}
                 supabase_client.table("jobs").update(data).eq("id", job_id).execute()
@@ -185,65 +177,4 @@ def run_pipeline(job_id: str, filepath: str, explanation_level: str = "concise_2
         raise
 
 
-import shutil
-
-def _render_video(props_path: str, output_path: str) -> None:
-    """Call Remotion CLI via Node to render the video securely."""
-    # ── NUCLEAR DYNAMIC PATH RESOLUTION ──────────────────────────────────────
-    base_execution_dir = os.getcwd() 
-    print(f"DEBUG: Python is executing from: {base_execution_dir}")
-
-    # Explicitly looking for 'remotion_project' as requested
-    remotion_dir = os.path.abspath(os.path.join(base_execution_dir, "remotion_project"))
-    
-    # If not found at direct level, try one level up (helpful if executing from /backend)
-    if not os.path.exists(remotion_dir):
-        alt_path = os.path.abspath(os.path.join(base_execution_dir, "..", "remotion_project"))
-        if os.path.exists(alt_path):
-            remotion_dir = alt_path
-
-    print(f"DEBUG: Target Remotion Directory resolved to: {remotion_dir}")
-
-    if not os.path.exists(remotion_dir):
-        print(f"CRITICAL ERROR: {remotion_dir} does not exist!")
-        # Extra directory listing for debugging
-        try:
-            print(f"DEBUG: Contents of {base_execution_dir}: {os.listdir(base_execution_dir)}")
-        except: pass
-        raise FileNotFoundError(f"Remotion directory not found: {remotion_dir}")
-
-    remotion_abs = remotion_dir
-
-    # Normalize paths for Remotion (forward slashes satisfy Remotion's CLI parser)
-    props_abs = os.path.abspath(props_path).replace("\\", "/")
-    output_abs = os.path.abspath(output_path).replace("\\", "/")
-
-    # On Windows use 'npx.cmd'; on Linux/macOS (Render container) use 'npx'
-    npx_exec = 'npx.cmd' if os.name == 'nt' else 'npx'
-
-    cmd = [
-        npx_exec,
-        "--yes",
-        "remotion",
-        "render",
-        "src/index.tsx",
-        "DataNarrate",
-        output_abs,
-        f"--props={props_abs}",
-        "--log=error"
-    ]
-
-    print(f"[Remotion] cwd={remotion_abs}")
-    print(f"[Remotion] cmd={' '.join(cmd)}")
-
-    result = subprocess.run(
-        cmd,
-        cwd=remotion_abs,
-        capture_output=True,
-        timeout=600,
-        shell=False,
-    )
-
-    if result.returncode != 0:
-        err = result.stderr.decode('utf-8', errors='replace') if result.stderr else "Unknown Remotion Error"
-        raise RuntimeError(f"Remotion render failed (exit {result.returncode}): {err}")
+# Remotion rendering engine retired.

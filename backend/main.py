@@ -20,6 +20,7 @@ from fastapi.staticfiles import StaticFiles
 
 from pipeline import JOBS_DIR, get_result, get_status, job_dir, run_pipeline
 from modules.chatbot import HybridDataBot
+from modules.generate_wan_video import generate_video_via_wan
 
 class ChatRequest(BaseModel):
     query: str
@@ -109,7 +110,7 @@ async def get_job_result(job_id: str):
 
 
 @app.post("/api/chat/{job_id}")
-async def post_chat_query(job_id: str, request: ChatRequest):
+async def post_chat_query(job_id: str, request: ChatRequest, background_tasks: BackgroundTasks):
     jd = job_dir(job_id)
     if not jd.exists():
         raise HTTPException(status_code=404, detail="Job not found")
@@ -147,6 +148,12 @@ async def post_chat_query(job_id: str, request: ChatRequest):
     try:
         bot = HybridDataBot(df, findings_summary)
         response = bot.ask(request.query)
+        
+        # Trigger Wan2.1 video generation in background if response is substantial
+        if response and len(response) > 20:
+            output_mp4 = str(jd / "summary_video.mp4")
+            background_tasks.add_task(generate_video_via_wan, response, output_mp4)
+            
         return JSONResponse({"response": response})
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Hybrid Chatbot reasoning error: {str(e)}")
