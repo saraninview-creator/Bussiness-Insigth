@@ -36,12 +36,7 @@ from modules.script_gen import generate_script
 from modules.tts import concatenate_audio, synthesize_segments
 
 JOBS_DIR = Path(__file__).parent / "jobs"
-REMOTION_DIR = Path(__file__).parent.parent / "remotion"
-
-# Print at module load — appears immediately in Render startup logs
-print(f"[STARTUP] pipeline.py loaded from: {__file__}")
-print(f"[STARTUP] REMOTION_DIR resolved to: {REMOTION_DIR.resolve()}")
-print(f"[STARTUP] REMOTION_DIR exists: {REMOTION_DIR.exists()}")
+# REMOTION_DIR is now resolved dynamically inside the render function as requested
 
 
 def job_dir(job_id: str) -> Path:
@@ -194,24 +189,30 @@ import shutil
 
 def _render_video(props_path: str, output_path: str) -> None:
     """Call Remotion CLI via Node to render the video securely."""
-    # Use the module-level REMOTION_DIR constant which is anchored via Path(__file__).
-    # This resolves correctly BOTH locally (C:\...\insight\remotion)
-    # AND inside the Render container (/app/remotion) regardless of cwd.
-    remotion_abs = str(REMOTION_DIR.resolve())
+    # ── NUCLEAR DYNAMIC PATH RESOLUTION ──────────────────────────────────────
+    base_execution_dir = os.getcwd() 
+    print(f"DEBUG: Python is executing from: {base_execution_dir}")
 
-    # ── Runtime path validation (shows up in Render logs) ────────────────────
-    print(f"[DEBUG] Python cwd         : {os.getcwd()}")
-    print(f"[DEBUG] pipeline __file__  : {__file__}")
-    print(f"[DEBUG] REMOTION_DIR       : {REMOTION_DIR}")
-    print(f"[DEBUG] remotion_abs       : {remotion_abs}")
-    print(f"[DEBUG] remotion exists    : {os.path.exists(remotion_abs)}")
+    # Explicitly looking for 'remotion_project' as requested
+    remotion_dir = os.path.abspath(os.path.join(base_execution_dir, "remotion_project"))
+    
+    # If not found at direct level, try one level up (helpful if executing from /backend)
+    if not os.path.exists(remotion_dir):
+        alt_path = os.path.abspath(os.path.join(base_execution_dir, "..", "remotion_project"))
+        if os.path.exists(alt_path):
+            remotion_dir = alt_path
 
-    if not os.path.exists(remotion_abs):
-        import glob
-        nearby = glob.glob('/app/*') or glob.glob(str(Path(remotion_abs).parent / '*'))
-        print(f"[CRITICAL ERROR] {remotion_abs} does not exist!")
-        print(f"[CRITICAL ERROR] Contents of parent dir: {nearby}")
-        raise FileNotFoundError(f"Remotion directory not found: {remotion_abs}")
+    print(f"DEBUG: Target Remotion Directory resolved to: {remotion_dir}")
+
+    if not os.path.exists(remotion_dir):
+        print(f"CRITICAL ERROR: {remotion_dir} does not exist!")
+        # Extra directory listing for debugging
+        try:
+            print(f"DEBUG: Contents of {base_execution_dir}: {os.listdir(base_execution_dir)}")
+        except: pass
+        raise FileNotFoundError(f"Remotion directory not found: {remotion_dir}")
+
+    remotion_abs = remotion_dir
 
     # Normalize paths for Remotion (forward slashes satisfy Remotion's CLI parser)
     props_abs = os.path.abspath(props_path).replace("\\", "/")

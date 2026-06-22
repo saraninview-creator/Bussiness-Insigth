@@ -25,27 +25,22 @@ COPY backend/requirements.txt ./backend/
 RUN pip install --no-cache-dir -r ./backend/requirements.txt
 
 # ── Stage 6: Copy ALL project files into /app FIRST ──────────────────────────
-# CRITICAL ORDER: COPY . . must come BEFORE npm ci.
-# Previously npm ci ran first and COPY . . second — the COPY overwrote
-# /app/remotion/ with the git-tracked version (empty node_modules because
-# node_modules/ is in .gitignore). This caused: [Errno 2] No such file /remotion
+# This captures 'remotion_project', 'backend', 'api', etc.
 COPY . .
 
 # ── Stage 7: Install Node/Remotion dependencies AFTER copy ───────────────────
-# npm ci now installs into /app/remotion/node_modules and nothing overwrites it.
-RUN cd /app/remotion && npm ci
+# Ensuring we use the new 'remotion_project' folder name
+RUN cd /app/remotion_project && npm ci
 
-# ── Stage 8: Build-time verification (hard fail if /app/remotion is missing) ──
+# ── Stage 8: Build-time verification ─────────────────────────────────────────
 RUN echo "=== /app structure ===" && ls -la /app && \
-    echo "=== /app/remotion ===" && ls /app/remotion && \
-    echo "=== remotion/node_modules present ===" && ls /app/remotion/node_modules | head -5 && \
-    echo "=== Resolved remotion path from pipeline.py ===" && \
-    python3 -c "import os; f='/app/backend/pipeline.py'; print(os.path.abspath(os.path.join(os.path.dirname(f), '..', 'remotion')))"
+    echo "=== /app/remotion_project ===" && ls /app/remotion_project && \
+    echo "=== remotion_project/node_modules present ===" && ls /app/remotion_project/node_modules | head -5
 
 # ── Stage 9: Runtime environment ─────────────────────────────────────────────
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 
-# Run uvicorn from /app/backend
-WORKDIR /app/backend
-CMD ["python", "main.py"]
+# Run uvicorn from the root to ensure os.getcwd() is /app
+# This aligns with the dynamic path resolution in pipeline.py
+CMD ["python", "backend/main.py"]

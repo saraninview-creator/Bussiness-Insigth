@@ -13,7 +13,7 @@ pip install -r "$Root\backend\requirements.txt"
 
 # ── 2. Remotion deps ──────────────────────────────────────────────────────────
 Write-Host "`n[2/4] Installing Remotion dependencies..." -ForegroundColor Yellow
-Push-Location "$Root\remotion"; npm install; Pop-Location
+Push-Location "$Root\remotion_project"; npm install; Pop-Location
 
 # ── 3. Frontend deps ──────────────────────────────────────────────────────────
 Write-Host "`n[3/4] Installing frontend dependencies..." -ForegroundColor Yellow
