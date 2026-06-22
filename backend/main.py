@@ -15,7 +15,7 @@ from pydantic import BaseModel
 import aiofiles
 from fastapi import BackgroundTasks, FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from pipeline import JOBS_DIR, get_result, get_status, job_dir, run_pipeline
@@ -50,7 +50,7 @@ ALLOWED_EXTENSIONS = {".csv", ".xlsx", ".xls"}
 @app.post("/upload")
 async def upload_file(
     file: UploadFile = File(...),
-    explanation_level: str = Form("concise_21s")
+    explanation_level: str = Form("standard_65s")
 ):
     """Accept a CSV/Excel upload, start the analysis pipeline, return job_id."""
     ext = Path(file.filename).suffix.lower()
@@ -147,14 +147,17 @@ async def post_chat_query(job_id: str, request: ChatRequest, background_tasks: B
     # Instantiate hybrid conversational protocol
     try:
         bot = HybridDataBot(df, findings_summary)
-        response = bot.ask(request.query)
         
-        # Trigger Wan2.1 video generation in background if response is substantial
-        if response and len(response) > 20:
+        # Trigger Wan2.1 video generation in background if query is substantial
+        if request.query and len(request.query) > 10:
             output_mp4 = str(jd / "summary_video.mp4")
-            background_tasks.add_task(generate_video_via_wan, response, output_mp4)
+            background_tasks.add_task(generate_video_via_wan, request.query, output_mp4)
             
-        return JSONResponse({"response": response})
+        def stream_generator():
+            for chunk in bot.ask_stream(request.query):
+                yield f"data: {json.dumps({'chunk': chunk})}\n\n"
+
+        return StreamingResponse(stream_generator(), media_type="text/event-stream")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Hybrid Chatbot reasoning error: {str(e)}")
 

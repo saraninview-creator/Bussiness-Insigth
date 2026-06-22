@@ -33,8 +33,9 @@ def generate_video_via_wan(prompt_text: str, output_path: str = None):
         "--ckpt_dir", "./Wan2.1-T2V-1.3B",
         "--offload_model", "True",
         "--t5_cpu",
-        "--sample_shift", "8",
+        "--sample_shift", "10",
         "--sample_guide_scale", "6",
+        "--frame_num", "521", # Targets roughly 65 seconds at 8fps
         "--prompt", prompt_text
     ]
 

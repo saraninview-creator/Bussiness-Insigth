@@ -35,45 +35,52 @@ function Chatbot({findings}) {
 
   const allText = useMemo(() => findings.map(f => f.text).join(' ').toLowerCase(), [findings]);
   
-  const handleSend = (text) => {
+  const params = useParams();
+
+  const handleSend = async (text) => {
     if (!text.trim()) return;
-    setMessages(prev => [...prev, {user: true, text}]);
+    const userMsg = {user: true, text};
+    setMessages(prev => [...prev, userMsg]);
     setInput('');
     
-    // Simulate delay
-    setTimeout(() => {
-      const q = text.toLowerCase();
-      let response = '';
+    const botMsgId = Date.now();
+    setMessages(prev => [...prev, {user: false, text: '', id: botMsgId}]);
 
-      if (q.includes('problem') || q.includes('issue')) {
-        const probs = findings.filter(f => f.type === 'problem');
-        response = probs.length 
-          ? "Here are the main problems found: " + probs.map(p => p.text).join(" ")
-          : "I didn't find any major problems in this dataset.";
-      } else if (q.includes('growth') || q.includes('opportunity') || q.includes('suggestion')) {
-        const suggs = findings.filter(f => f.type === 'suggestion');
-        response = suggs.length 
-          ? "Here are some growth opportunities: " + suggs.map(s => s.text).join(" ")
-          : "No specific suggestions were generated.";
-      } else if (q.includes('insight') || q.includes('top')) {
-        const ins = findings.filter(f => f.type === 'insight');
-        response = ins.length 
-          ? "Top insight: " + ins[0].text
-          : "No core insights were found.";
-      } else {
-        // Keyword matching
-        const words = q.split(' ').filter(w => w.length > 3);
-        const match = findings.find(f => words.some(w => f.text.toLowerCase().includes(w)));
-        if (match) {
-          response = `I found this related to your question: ${match.text}`;
-        } else {
-          // Extract column names if possible (from meta or text)
-          const cols = [...new Set(findings.map(f => f.meta?.col || f.meta?.col1 || '').filter(Boolean))];
-          response = `I couldn't find an exact match for that. Try asking about your data columns: ${cols.length ? cols.join(', ') : 'the general metrics'}.`;
+    try {
+      const response = await fetch(`${API_URL}/api/chat/${params.jobId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: text }),
+      });
+
+      if (!response.body) throw new Error('No response body');
+      
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let streamedText = '';
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+
+        const raw = decoder.decode(value);
+        const lines = raw.split('\n');
+        
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              streamedText += data.chunk;
+              setMessages(prev => prev.map(m => 
+                m.id === botMsgId ? { ...m, text: streamedText } : m
+              ));
+            } catch (e) {}
+          }
         }
       }
-      setMessages(prev => [...prev, {user: false, text: response}]);
-    }, 600);
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   if (!open) {
@@ -269,6 +276,16 @@ export default function ResultsPage() {
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('insight');
+
+  const interactions = (items, label) => (
+    <div className="findings-col-content">
+      {items.length === 0
+        ? <div className="empty-col">No {label.toLowerCase()} found in this audit.</div>
+        : <div className="findings-tab-grid">{items.map(f => <FindingCard key={f.id} finding={f} />)}</div>
+      }
+    </div>
+  );
 
   useEffect(() => {
     if (!jobId) return;
@@ -391,13 +408,36 @@ export default function ResultsPage() {
         </p>
       </div>
 
-      {/* Findings panel */}
-      <div>
-        <div className="results-section-title">Findings ({findings.length})</div>
-        <div className="findings-grid">
-          <FindingsColumn type="insight"    label="Insights"    findings={insights}    />
-          <FindingsColumn type="problem"    label="Problems"    findings={problems}    />
-          <FindingsColumn type="suggestion" label="Suggestions" findings={suggestions} />
+      {/* Findings panel with dynamic tabs */}
+      <div className="findings-section">
+        <div className="results-section-header">
+          <div className="results-section-title">Structural Audit ({findings.length} findings)</div>
+          <div className="tab-switcher">
+            <button 
+              className={`tab-btn ${activeTab === 'insight' ? 'active' : ''}`}
+              onClick={() => setActiveTab('insight')}
+            >
+              INSIGHTS ({insights.length})
+            </button>
+            <button 
+              className={`tab-btn ${activeTab === 'problem' ? 'active' : ''}`}
+              onClick={() => setActiveTab('problem')}
+            >
+              PROBLEMS ({problems.length})
+            </button>
+            <button 
+              className={`tab-btn ${activeTab === 'suggestion' ? 'active' : ''}`}
+              onClick={() => setActiveTab('suggestion')}
+            >
+              SUGGESTIONS ({suggestions.length})
+            </button>
+          </div>
+        </div>
+
+        <div className="active-tab-content">
+          {activeTab === 'insight' && interactions(insights, 'Insights')}
+          {activeTab === 'problem' && interactions(problems, 'Problems')}
+          {activeTab === 'suggestion' && interactions(suggestions, 'Suggestions')}
         </div>
       </div>
 

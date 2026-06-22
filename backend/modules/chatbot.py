@@ -102,55 +102,54 @@ class HybridDataBot:
                     
         return None
 
-    def _execute_gemini_fallback(self, query: str) -> str:
+    def _execute_gemini_fallback_stream(self, query: str):
         """
-        Level 2 Check:
-        Utilize Google Gemini SDK to intelligently digest the prompt using 
-        the dataset schema and existing analytics summary as context.
+        Level 2 Check (Streaming):
+        Utilize Google Gemini SDK (Gemini 3.5 Flash) to stream text tokens chunk-by-chunk.
         """
         if not self.client:
-            return "Error: GEMINI_API_KEY is not configured. The AI cannot process this advanced query."
+            yield "Error: GEMINI_API_KEY is not configured."
+            return
 
-        # Setup the System Context Prompt
         system_instruction = (
-            "You are a Senior Data Analyst AI embedded in the 'DataNarrate' platform.\n"
-            "You are answering a user's question regarding an uploaded dataset.\n"
+            "You are an Elite Data Narrator and Financial Analyst AI.\n"
+            "Answering user questions regarding their dataset.\n"
             f"{self._schema_str}\n\n"
-            "Here is the pre-computed analytical findings summary over this data:\n"
+            "Findings Summary:\n"
             f"{self.findings_summary}\n\n"
-            "Instructions:\n"
-            "Provide clear, concise, and analytical answers. Format outputs using markdown. "
-            "Use the provided summary and schema context to infer the best insights. Do not hallucinate data values."
+            "Format: Use strict markdown. Provide deep statistical insights. Be concise but insightful. Standardize on the Gemini 3.5 Flash model."
         )
 
         try:
-            response = self.client.models.generate_content(
-                model='gemini-2.5-flash',
+            for chunk in self.client.models.generate_content_stream(
+                model='gemini-3.5-flash',
                 contents=query,
                 config=types.GenerateContentConfig(
                     system_instruction=system_instruction,
-                    temperature=0.3,
+                    temperature=0.4,
                 )
-            )
-            return response.text
+            ):
+                if chunk.text:
+                    yield chunk.text
         except Exception as e:
-            return f"Error connecting to Gemini API: {str(e)}"
+            yield f"Error connecting to Gemini API: {str(e)}"
 
-    def ask(self, user_query: str) -> str:
+    def ask_stream(self, user_query: str):
         """
-        Main interface method. Tries Level 1 (Heuristics) first. 
-        If no rules match, gracefully routes exactly to Level 2 (Gemini Fallback).
+        Main streaming interface. Returns a generator yielding text chunks.
         """
         if not user_query.strip():
-            return "Please provide a valid question."
+            yield "Please provide a valid question."
+            return
 
-        # Level 1: Heuristic Interception
+        # Level 1: Heuristic Interception (Not streamed)
         instant_response = self._execute_rule_based(user_query)
         if instant_response:
-            return instant_response
+            yield instant_response
+            return
 
-        # Level 2: Deep LLM Reasoning
-        return self._execute_gemini_fallback(user_query)
+        # Level 2: Stream from Gemini 3.5 Flash
+        yield from self._execute_gemini_fallback_stream(user_query)
 
 # Example usage string at EOF (Optional)
 # if __name__ == "__main__":
